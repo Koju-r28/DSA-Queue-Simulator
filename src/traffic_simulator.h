@@ -1,26 +1,28 @@
 #ifndef TRAFFIC_SIMULATION_H
 #define TRAFFIC_SIMULATION_H
 
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <stdbool.h>
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 #define LANE_WIDTH 80
-#define MAX_VEHICLES 10
+#define MAX_VEHICLES 100  // FIXED: Increased from 10 to handle more vehicles
 #define INTERSECTION_X (WINDOW_WIDTH / 2)
+#define INTERSECTION_Y (WINDOW_HEIGHT / 2)  // FIXED: Added missing definition
 
 typedef enum {
-    DIRECTION_NORTH,
-    DIRECTION_SOUTH,
-    DIRECTION_EAST,
-    DIRECTION_WEST
+    DIRECTION_NORTH = 0,
+    DIRECTION_SOUTH = 1,
+    DIRECTION_EAST = 2,
+    DIRECTION_WEST = 3
 } Direction;
 
 typedef enum {
-    TURN_NONE,
+    TURN_NONE = 0,
     TURN_LEFT,
-    TURN_RIGHT
+    TURN_RIGHT,
+    TURN_STRAIGHT  // FIXED: Added for better turn logic
 } TurnDirection;
 
 typedef enum {
@@ -31,18 +33,19 @@ typedef enum {
 } VehicleState;
 
 typedef enum {
-    REGULAR_CAR,
-
+    REGULAR_CAR = 0,
+    EMERGENCY_VEHICLE  // FIXED: Added for future expansion
 } VehicleType;
 
 typedef enum {
     RED,
+    YELLOW,  // FIXED: Added yellow light state
     GREEN
 } TrafficLightState;
 
 #define TRAFFIC_LIGHT_WIDTH (LANE_WIDTH * 2)
 #define TRAFFIC_LIGHT_HEIGHT (LANE_WIDTH - LANE_WIDTH / 3)
-#define STOP_LINE_WIDTH 5
+#define STOP_LINE_WIDTH 3  // FIXED: Changed from 5 to match rendering code
 
 typedef struct {
     SDL_Rect rect;
@@ -56,7 +59,7 @@ typedef struct {
     bool active;
     float turnAngle;  
     bool isInRightLane;
-    bool turnProgress;
+    float turnProgress;  // FIXED: Changed from bool to float for smoother turns
 } Vehicle;
 
 typedef struct {
@@ -69,7 +72,7 @@ typedef struct {
 typedef struct {
     int vehiclesPassed;
     int totalVehicles;
-    float vehiclesPerMinute;
+    float averageWaitTime;  // FIXED: More useful than vehiclesPerMinute
     Uint32 startTime;
 } Statistics;
 
@@ -102,4 +105,9 @@ void initQueue(Queue* q);
 void enqueue(Queue* q, Vehicle vehicle);
 Vehicle dequeue(Queue* q);
 int isQueueEmpty(Queue* q);
-#endif
+
+// FIXED: Added missing utility functions
+void updateStatistics(Statistics* stats, Vehicle* vehicles);
+void cleanupInactiveVehicles(Vehicle* vehicles);
+
+#endif // TRAFFIC_SIMULATION_H
