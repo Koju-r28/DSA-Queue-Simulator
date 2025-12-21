@@ -22,7 +22,7 @@ int SDL_main(int argc, char *argv[]) {
     }
 
     while (1) {
-        // Generate a new vehicle
+        
         Direction spawnDirection = (Direction)(rand() % 4);
         Vehicle *newVehicle = createVehicle(spawnDirection);
 
@@ -40,4 +40,4 @@ int SDL_main(int argc, char *argv[]) {
     fclose(file);
     return 0;
     
-}
+} 
