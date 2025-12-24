@@ -120,4 +120,4 @@ Vehicle dequeue(Queue* q);
 int isQueueEmpty(Queue* q);
 void removeFromQueue(Queue* q, Vehicle* vehicle);
 
-#endif // TRAFFIC_SIMULATION_H
+#endif 

@@ -3,10 +3,8 @@
 #include <math.h>
 #include "traffic_simulation.h"
 
-// Global queues for lanes (one queue per direction)
 Queue laneQueues[4];
 
-// Pastel colors for vehicles
 const SDL_Color VEHICLE_COLORS[] = {
     {255, 182, 193, 255},   // Light Pink
     {173, 216, 230, 255},   // Light Blue
@@ -79,7 +77,6 @@ Vehicle *createVehicle(Direction direction) {
     vehicle->speed = 2.0f;
     vehicle->state = STATE_MOVING;
     
-    // 15% chance to turn left, 85% go straight on highway
     int turnChance = rand() % 100;
     if (turnChance < 15) {
         vehicle->turnDirection = TURN_LEFT;
@@ -122,13 +119,10 @@ Vehicle *createVehicle(Direction direction) {
     vehicle->rect.x = (int)vehicle->x;
     vehicle->rect.y = (int)vehicle->y;
 
-    // Add to queue
     enqueue(&laneQueues[direction], *vehicle);
 
     return vehicle;
 }
-
-// Check if vehicle should stop for vehicle ahead IN SAME QUEUE
 bool shouldStopForVehicleInQueue(Vehicle *vehicle, Direction lane) {
     float criticalDistance = 100.0f;
     
@@ -179,19 +173,17 @@ void updateVehicle(Vehicle *vehicle, TrafficLight *lights) {
     float stopLine = 0;
     bool shouldStopLight = false;
     bool reachedCenter = false;
-
-    // Calculate stop line and check if at intersection center
     switch (vehicle->direction) {
         case DIRECTION_NORTH:
             stopLine = INTERSECTION_Y + LANE_WIDTH;
             reachedCenter = (vehicle->y <= INTERSECTION_Y && !vehicle->hasPassedCenter);
-            // ONLY allow LEFT TURN on red, STRAIGHT must stop
+            
             if (lights[DIRECTION_NORTH].state == RED) {
                 if (vehicle->turnDirection == TURN_LEFT) {
-                    // Left turn can proceed on red
+                    
                     shouldStopLight = false;
                 } else {
-                    // Straight must stop on red
+                    
                     shouldStopLight = (vehicle->y > stopLine - 80 && vehicle->y < stopLine + 10);
                 }
             }
@@ -231,7 +223,6 @@ void updateVehicle(Vehicle *vehicle, TrafficLight *lights) {
             break;
     }
 
-    // Start turning when reaching intersection center
     if (vehicle->turnDirection == TURN_LEFT && reachedCenter) {
         vehicle->isTurning = true;
         vehicle->hasPassedCenter = true;
@@ -239,8 +230,6 @@ void updateVehicle(Vehicle *vehicle, TrafficLight *lights) {
         const char* lightState = lights[vehicle->direction].state == RED ? "RED" : "GREEN";
         printf(">>> Vehicle TURNING LEFT on %s LIGHT from direction %d\n", lightState, vehicle->direction);
     }
-
-    // Check for vehicles ahead in same queue
     bool shouldStopVehicle = shouldStopForVehicleInQueue(vehicle, vehicle->direction);
     bool shouldStop = shouldStopLight || shouldStopVehicle;
 
@@ -258,7 +247,7 @@ void updateVehicle(Vehicle *vehicle, TrafficLight *lights) {
     // Movement and turning
     if (vehicle->speed > 0) {
         if (vehicle->isTurning && vehicle->turnProgress < 1.0f) {
-            // Execute smooth LEFT turn (90-degree curve)
+            
             vehicle->turnProgress += 0.03f;
             float angle = vehicle->turnProgress * 1.57f;
             
@@ -314,7 +303,7 @@ void updateVehicle(Vehicle *vehicle, TrafficLight *lights) {
                     break;
             }
         } else if (!vehicle->isTurning) {
-            // Normal straight movement on highway
+            
             switch (vehicle->direction) {
                 case DIRECTION_NORTH: vehicle->y -= vehicle->speed; break;
                 case DIRECTION_SOUTH: vehicle->y += vehicle->speed; break;
@@ -324,7 +313,6 @@ void updateVehicle(Vehicle *vehicle, TrafficLight *lights) {
         }
     }
 
-    // Remove if off screen
     if (vehicle->y < -50 || vehicle->y > WINDOW_HEIGHT + 50 ||
         vehicle->x < -50 || vehicle->x > WINDOW_WIDTH + 50) {
         vehicle->active = false;
@@ -356,7 +344,7 @@ void renderRoads(SDL_Renderer *renderer) {
 }
 
 void renderSimulation(SDL_Renderer *renderer, TrafficLight *lights, Statistics *stats) {
-    // FORCE BRIGHT GREEN BACKGROUND - TRIPLE CHECK
+    
     SDL_SetRenderDrawColor(renderer, 50, 205, 50, 255);  // Lime green
     SDL_RenderClear(renderer);
     
@@ -367,7 +355,7 @@ void renderSimulation(SDL_Renderer *renderer, TrafficLight *lights, Statistics *
 
     renderRoads(renderer);
 
-    // Draw traffic lights
+    // Drawing traffic lights
     for (int i = 0; i < 4; i++) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_Rect border = lights[i].position;
@@ -383,7 +371,7 @@ void renderSimulation(SDL_Renderer *renderer, TrafficLight *lights, Statistics *
         SDL_RenderFillRect(renderer, &lights[i].position);
     }
 
-    // Draw vehicles from all queues
+    // Drawing vehicles from all queues
     for (int lane = 0; lane < 4; lane++) {
         Node *current = laneQueues[lane].front;
         while (current != NULL) {
@@ -393,7 +381,7 @@ void renderSimulation(SDL_Renderer *renderer, TrafficLight *lights, Statistics *
                 SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
                 SDL_RenderFillRect(renderer, &v->rect);
                 
-                // Draw black outline
+                
                 SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
                 SDL_RenderDrawRect(renderer, &v->rect);
             }
@@ -449,5 +437,5 @@ int isQueueEmpty(Queue *q) {
 }
 
 void removeFromQueue(Queue *q, Vehicle *vehicle) {
-    // Not needed in this implementation
+
 }

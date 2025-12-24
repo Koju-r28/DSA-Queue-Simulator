@@ -37,20 +37,14 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL));
     initializeSDL(&window, &renderer);
-
-    // Initialize traffic lights
     TrafficLight lights[4];
     initializeTrafficLights(lights);
-
-    // Initialize statistics
     Statistics stats = {
         .vehiclesPassed = 0,
         .totalVehicles = 0,
         .vehiclesPerMinute = 0,
         .startTime = SDL_GetTicks()
     };
-
-    // Initialize 4 queues (one per lane)
     for (int i = 0; i < 4; i++) {
         initQueue(&laneQueues[i]);
     }
@@ -63,12 +57,8 @@ int main(int argc, char *argv[]) {
         handleEvents(&running);
 
         Uint32 currentTime = SDL_GetTicks();
-
-        // Spawn new vehicle every 2 seconds
         if (currentTime - lastVehicleSpawn >= SPAWN_INTERVAL) {
             Direction spawnDirection = (Direction)(rand() % 4);
-            
-            // Create vehicle and add to appropriate queue
             Vehicle *newVehicle = createVehicle(spawnDirection);
             if (newVehicle) {
                 const char* dirNames[] = {"NORTH", "SOUTH", "EAST", "WEST"};
@@ -86,7 +76,6 @@ int main(int argc, char *argv[]) {
             lastVehicleSpawn = currentTime;
         }
         
-        // Debug: Print status every 3 seconds
         static Uint32 lastDebug = 0;
         if (currentTime - lastDebug >= 3000) {
             printf("\n[STATUS] Queue sizes: N=%d, S=%d, E=%d, W=%d | Total passed: %d\n",
@@ -95,8 +84,6 @@ int main(int argc, char *argv[]) {
                    stats.vehiclesPassed);
             lastDebug = currentTime;
         }
-
-        // Update all vehicles in all queues
         for (int lane = 0; lane < 4; lane++) {
             Node *current = laneQueues[lane].front;
             Node *prev = NULL;
@@ -105,16 +92,13 @@ int main(int argc, char *argv[]) {
                 Vehicle *v = &current->vehicle;
                 
                 if (v->active) {
-                    // Update vehicle position
+                    
                     updateVehicle(v, lights);
                     
-                    // Check if vehicle left the screen
                     if (!v->active) {
                         printf("Vehicle removed from lane %d, Queue size now: %d\n", 
                                lane, laneQueues[lane].size - 1);
                         stats.vehiclesPassed++;
-                        
-                        // Remove from queue
                         Node *toDelete = current;
                         if (prev == NULL) {
                             laneQueues[lane].front = current->next;
@@ -137,20 +121,14 @@ int main(int argc, char *argv[]) {
                 current = current->next;
             }
         }
-
-        // Update traffic lights
         updateTrafficLights(lights);
-
-        // Update statistics
         float minutes = (SDL_GetTicks() - stats.startTime) / 60000.0f;
         if (minutes > 0) {
             stats.vehiclesPerMinute = stats.vehiclesPassed / minutes;
         }
-
-        // Render everything
         renderSimulation(renderer, lights, &stats);
 
-        SDL_Delay(16); // ~60 FPS
+        SDL_Delay(16); 
     }
 
     cleanupSDL(window, renderer);
