@@ -55,16 +55,14 @@ int main(int argc, char *argv[]) {
         initQueue(&laneQueues[i]);
     }
 
-    printf("Traffic Simulation Started - Queue Based\n");
-    printf("4 Queues: North, South, East, West\n");
-    
-    int frameCount = 0;
+    printf("Traffic Simulation Started - Queue Based with LEFT TURNS\n");
+    printf("GREEN BACKGROUND | 4 Queues: North, South, East, West\n");
+    printf("15%% vehicles will turn LEFT, 85%% go STRAIGHT\n\n");
 
     while (running) {
         handleEvents(&running);
 
         Uint32 currentTime = SDL_GetTicks();
-        frameCount++;
 
         // Spawn new vehicle every 2 seconds
         if (currentTime - lastVehicleSpawn >= SPAWN_INTERVAL) {
@@ -73,8 +71,13 @@ int main(int argc, char *argv[]) {
             // Create vehicle and add to appropriate queue
             Vehicle *newVehicle = createVehicle(spawnDirection);
             if (newVehicle) {
-                printf("Frame %d: Vehicle spawned in lane %d (N=0,S=1,E=2,W=3), Queue size: %d\n", 
-                       frameCount, spawnDirection, laneQueues[spawnDirection].size);
+                const char* dirNames[] = {"NORTH", "SOUTH", "EAST", "WEST"};
+                const char* turnNames[] = {"STRAIGHT", "LEFT", "RIGHT"};
+                printf("=== SPAWNED: Dir=%s, Turn=%s, Color=%d, Queue size=%d ===\n", 
+                       dirNames[spawnDirection], 
+                       turnNames[newVehicle->turnDirection],
+                       newVehicle->colorIndex,
+                       laneQueues[spawnDirection].size);
                 
                 stats.totalVehicles++;
                 free(newVehicle);
@@ -83,11 +86,14 @@ int main(int argc, char *argv[]) {
             lastVehicleSpawn = currentTime;
         }
         
-        // Debug: Print queue sizes every 100 frames
-        if (frameCount % 100 == 0) {
-            printf("Queue sizes: N=%d, S=%d, E=%d, W=%d\n",
+        // Debug: Print status every 3 seconds
+        static Uint32 lastDebug = 0;
+        if (currentTime - lastDebug >= 3000) {
+            printf("\n[STATUS] Queue sizes: N=%d, S=%d, E=%d, W=%d | Total passed: %d\n",
                    laneQueues[0].size, laneQueues[1].size, 
-                   laneQueues[2].size, laneQueues[3].size);
+                   laneQueues[2].size, laneQueues[3].size,
+                   stats.vehiclesPassed);
+            lastDebug = currentTime;
         }
 
         // Update all vehicles in all queues
@@ -104,8 +110,8 @@ int main(int argc, char *argv[]) {
                     
                     // Check if vehicle left the screen
                     if (!v->active) {
-                        printf("Frame %d: Vehicle removed from lane %d, Queue size now: %d\n", 
-                               frameCount, lane, laneQueues[lane].size - 1);
+                        printf("Vehicle removed from lane %d, Queue size now: %d\n", 
+                               lane, laneQueues[lane].size - 1);
                         stats.vehiclesPassed++;
                         
                         // Remove from queue
@@ -141,7 +147,7 @@ int main(int argc, char *argv[]) {
             stats.vehiclesPerMinute = stats.vehiclesPassed / minutes;
         }
 
-        // Render everything (passing lights and stats only)
+        // Render everything
         renderSimulation(renderer, lights, &stats);
 
         SDL_Delay(16); // ~60 FPS

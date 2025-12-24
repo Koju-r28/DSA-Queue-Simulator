@@ -61,6 +61,9 @@ typedef struct {
     bool active;
     int colorIndex;
     bool shouldStopForVehicle;
+    bool isTurning;
+    float turnProgress;
+    bool hasPassedCenter;
 } Vehicle;
 
 // Traffic light structure

@@ -78,8 +78,19 @@ Vehicle *createVehicle(Direction direction) {
     vehicle->active = true;
     vehicle->speed = 2.0f;
     vehicle->state = STATE_MOVING;
-    vehicle->turnDirection = TURN_STRAIGHT;
+    
+    // 15% chance to turn left, 85% go straight on highway
+    int turnChance = rand() % 100;
+    if (turnChance < 15) {
+        vehicle->turnDirection = TURN_LEFT;
+    } else {
+        vehicle->turnDirection = TURN_STRAIGHT;
+    }
+    
     vehicle->colorIndex = rand() % 8;
+    vehicle->isTurning = false;
+    vehicle->turnProgress = 0.0f;
+    vehicle->hasPassedCenter = false;
 
     if (direction == DIRECTION_NORTH || direction == DIRECTION_SOUTH) {
         vehicle->rect.w = 20;
@@ -167,35 +178,73 @@ void updateVehicle(Vehicle *vehicle, TrafficLight *lights) {
 
     float stopLine = 0;
     bool shouldStopLight = false;
+    bool reachedCenter = false;
 
+    // Calculate stop line and check if at intersection center
     switch (vehicle->direction) {
         case DIRECTION_NORTH:
             stopLine = INTERSECTION_Y + LANE_WIDTH;
-            shouldStopLight = (vehicle->y > stopLine - 80 && vehicle->y < stopLine + 10 && 
-                             lights[DIRECTION_NORTH].state == RED);
+            reachedCenter = (vehicle->y <= INTERSECTION_Y && !vehicle->hasPassedCenter);
+            // ONLY allow LEFT TURN on red, STRAIGHT must stop
+            if (lights[DIRECTION_NORTH].state == RED) {
+                if (vehicle->turnDirection == TURN_LEFT) {
+                    // Left turn can proceed on red
+                    shouldStopLight = false;
+                } else {
+                    // Straight must stop on red
+                    shouldStopLight = (vehicle->y > stopLine - 80 && vehicle->y < stopLine + 10);
+                }
+            }
             break;
         case DIRECTION_SOUTH:
             stopLine = INTERSECTION_Y - LANE_WIDTH;
-            shouldStopLight = (vehicle->y < stopLine + 80 && vehicle->y > stopLine - 10 && 
-                             lights[DIRECTION_SOUTH].state == RED);
+            reachedCenter = (vehicle->y >= INTERSECTION_Y && !vehicle->hasPassedCenter);
+            if (lights[DIRECTION_SOUTH].state == RED) {
+                if (vehicle->turnDirection == TURN_LEFT) {
+                    shouldStopLight = false;
+                } else {
+                    shouldStopLight = (vehicle->y < stopLine + 80 && vehicle->y > stopLine - 10);
+                }
+            }
             break;
         case DIRECTION_EAST:
             stopLine = INTERSECTION_X - LANE_WIDTH;
-            shouldStopLight = (vehicle->x < stopLine + 80 && vehicle->x > stopLine - 10 && 
-                             lights[DIRECTION_EAST].state == RED);
+            reachedCenter = (vehicle->x >= INTERSECTION_X && !vehicle->hasPassedCenter);
+            if (lights[DIRECTION_EAST].state == RED) {
+                if (vehicle->turnDirection == TURN_LEFT) {
+                    shouldStopLight = false;
+                } else {
+                    shouldStopLight = (vehicle->x < stopLine + 80 && vehicle->x > stopLine - 10);
+                }
+            }
             break;
         case DIRECTION_WEST:
             stopLine = INTERSECTION_X + LANE_WIDTH;
-            shouldStopLight = (vehicle->x > stopLine - 80 && vehicle->x < stopLine + 10 && 
-                             lights[DIRECTION_WEST].state == RED);
+            reachedCenter = (vehicle->x <= INTERSECTION_X && !vehicle->hasPassedCenter);
+            if (lights[DIRECTION_WEST].state == RED) {
+                if (vehicle->turnDirection == TURN_LEFT) {
+                    shouldStopLight = false;
+                } else {
+                    shouldStopLight = (vehicle->x > stopLine - 80 && vehicle->x < stopLine + 10);
+                }
+            }
             break;
+    }
+
+    // Start turning when reaching intersection center
+    if (vehicle->turnDirection == TURN_LEFT && reachedCenter) {
+        vehicle->isTurning = true;
+        vehicle->hasPassedCenter = true;
+        vehicle->turnProgress = 0.0f;
+        const char* lightState = lights[vehicle->direction].state == RED ? "RED" : "GREEN";
+        printf(">>> Vehicle TURNING LEFT on %s LIGHT from direction %d\n", lightState, vehicle->direction);
     }
 
     // Check for vehicles ahead in same queue
     bool shouldStopVehicle = shouldStopForVehicleInQueue(vehicle, vehicle->direction);
     bool shouldStop = shouldStopLight || shouldStopVehicle;
 
-    if (shouldStop) {
+    if (shouldStop && !vehicle->isTurning) {
         vehicle->speed = 0;
         vehicle->state = STATE_STOPPED;
     } else if (vehicle->state == STATE_STOPPED) {
@@ -206,15 +255,76 @@ void updateVehicle(Vehicle *vehicle, TrafficLight *lights) {
         if (vehicle->speed > 2.0f) vehicle->speed = 2.0f;
     }
 
+    // Movement and turning
     if (vehicle->speed > 0) {
-        switch (vehicle->direction) {
-            case DIRECTION_NORTH: vehicle->y -= vehicle->speed; break;
-            case DIRECTION_SOUTH: vehicle->y += vehicle->speed; break;
-            case DIRECTION_EAST: vehicle->x += vehicle->speed; break;
-            case DIRECTION_WEST: vehicle->x -= vehicle->speed; break;
+        if (vehicle->isTurning && vehicle->turnProgress < 1.0f) {
+            // Execute smooth LEFT turn (90-degree curve)
+            vehicle->turnProgress += 0.03f;
+            float angle = vehicle->turnProgress * 1.57f;
+            
+            Direction originalDir = vehicle->direction;
+            
+            switch (originalDir) {
+                case DIRECTION_NORTH:
+                    vehicle->x -= sin(angle) * 1.5f;
+                    vehicle->y -= cos(angle) * 1.5f;
+                    if (vehicle->turnProgress >= 1.0f) {
+                        vehicle->direction = DIRECTION_WEST;
+                        vehicle->rect.w = 30;
+                        vehicle->rect.h = 20;
+                        vehicle->isTurning = false;
+                        printf("<<< Completed turn: NORTH -> WEST\n");
+                    }
+                    break;
+                    
+                case DIRECTION_SOUTH:
+                    vehicle->x += sin(angle) * 1.5f;
+                    vehicle->y += cos(angle) * 1.5f;
+                    if (vehicle->turnProgress >= 1.0f) {
+                        vehicle->direction = DIRECTION_EAST;
+                        vehicle->rect.w = 30;
+                        vehicle->rect.h = 20;
+                        vehicle->isTurning = false;
+                        printf("<<< Completed turn: SOUTH -> EAST\n");
+                    }
+                    break;
+                    
+                case DIRECTION_EAST:
+                    vehicle->x += cos(angle) * 1.5f;
+                    vehicle->y -= sin(angle) * 1.5f;
+                    if (vehicle->turnProgress >= 1.0f) {
+                        vehicle->direction = DIRECTION_NORTH;
+                        vehicle->rect.w = 20;
+                        vehicle->rect.h = 30;
+                        vehicle->isTurning = false;
+                        printf("<<< Completed turn: EAST -> NORTH\n");
+                    }
+                    break;
+                    
+                case DIRECTION_WEST:
+                    vehicle->x -= cos(angle) * 1.5f;
+                    vehicle->y += sin(angle) * 1.5f;
+                    if (vehicle->turnProgress >= 1.0f) {
+                        vehicle->direction = DIRECTION_SOUTH;
+                        vehicle->rect.w = 20;
+                        vehicle->rect.h = 30;
+                        vehicle->isTurning = false;
+                        printf("<<< Completed turn: WEST -> SOUTH\n");
+                    }
+                    break;
+            }
+        } else if (!vehicle->isTurning) {
+            // Normal straight movement on highway
+            switch (vehicle->direction) {
+                case DIRECTION_NORTH: vehicle->y -= vehicle->speed; break;
+                case DIRECTION_SOUTH: vehicle->y += vehicle->speed; break;
+                case DIRECTION_EAST: vehicle->x += vehicle->speed; break;
+                case DIRECTION_WEST: vehicle->x -= vehicle->speed; break;
+            }
         }
     }
 
+    // Remove if off screen
     if (vehicle->y < -50 || vehicle->y > WINDOW_HEIGHT + 50 ||
         vehicle->x < -50 || vehicle->x > WINDOW_WIDTH + 50) {
         vehicle->active = false;
@@ -246,9 +356,14 @@ void renderRoads(SDL_Renderer *renderer) {
 }
 
 void renderSimulation(SDL_Renderer *renderer, TrafficLight *lights, Statistics *stats) {
-    // Beige background
-    SDL_SetRenderDrawColor(renderer, 245, 245, 220, 255);
+    // FORCE BRIGHT GREEN BACKGROUND - TRIPLE CHECK
+    SDL_SetRenderDrawColor(renderer, 50, 205, 50, 255);  // Lime green
     SDL_RenderClear(renderer);
+    
+    // Draw green again to make absolutely sure
+    SDL_Rect fullScreen = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT};
+    SDL_SetRenderDrawColor(renderer, 50, 205, 50, 255);
+    SDL_RenderFillRect(renderer, &fullScreen);
 
     renderRoads(renderer);
 
@@ -269,7 +384,6 @@ void renderSimulation(SDL_Renderer *renderer, TrafficLight *lights, Statistics *
     }
 
     // Draw vehicles from all queues
-    int totalRendered = 0;
     for (int lane = 0; lane < 4; lane++) {
         Node *current = laneQueues[lane].front;
         while (current != NULL) {
@@ -277,22 +391,14 @@ void renderSimulation(SDL_Renderer *renderer, TrafficLight *lights, Statistics *
             if (v->active) {
                 SDL_Color color = VEHICLE_COLORS[v->colorIndex];
                 SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-                
-                // Debug: print first vehicle position
-                if (totalRendered == 0) {
-                    printf("Rendering vehicle at (%d, %d) size (%d, %d)\n", 
-                           v->rect.x, v->rect.y, v->rect.w, v->rect.h);
-                }
-                
                 SDL_RenderFillRect(renderer, &v->rect);
-                totalRendered++;
+                
+                // Draw black outline
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+                SDL_RenderDrawRect(renderer, &v->rect);
             }
             current = current->next;
         }
-    }
-    
-    if (totalRendered > 0) {
-        printf("Total vehicles rendered: %d\n", totalRendered);
     }
 
     SDL_RenderPresent(renderer);
@@ -343,5 +449,5 @@ int isQueueEmpty(Queue *q) {
 }
 
 void removeFromQueue(Queue *q, Vehicle *vehicle) {
-    // Not needed in this simple implementation
+    // Not needed in this implementation
 }
